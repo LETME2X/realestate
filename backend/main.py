@@ -5,25 +5,19 @@ from dotenv import load_dotenv
 import httpx
 import os
 
-# Load environment variables
 load_dotenv()
 
-# Retrieve environment variables
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 EDEN_API_KEY = os.getenv("EDEN_API_KEY")
 EDEN_API_URL = os.getenv("EDEN_API_URL")
 
-# Check if the environment variables are loaded correctly
 if not all([SUPABASE_URL, SUPABASE_KEY, EDEN_API_KEY, EDEN_API_URL]):
     raise Exception("One or more environment variables are missing")
 
-
-# Create Supabase client
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 app = FastAPI()
-
 
 class GenerateRequest(BaseModel):
     brand_positioning: str
@@ -45,7 +39,6 @@ class RegenerateRequest(BaseModel):
     complete_text: str
     selected_text: str
     length_modification: str
-
 
 def call_eden_ai(prompt: str) -> str:
     headers = {
@@ -130,7 +123,6 @@ async def generate(request: GenerateRequest):
 @app.post("/insert", response_model=DataResponse)
 async def insert_data(data: Data):
     try:
-        # Perform the insert operation
         response = supabase.table('marketing_copy').insert({
             'positioning': data.positioning,
             'features': data.features,
@@ -139,11 +131,9 @@ async def insert_data(data: Data):
             'output': data.output
         }).execute()
 
-        # Check if there are any errors in the response
         if isinstance(response, Exception):
             raise HTTPException(status_code=500, detail="Error executing insert operation")
 
-        # Return a success message
         return {"message": "Data inserted successfully"}
 
     except Exception as e:
