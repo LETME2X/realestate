@@ -1,44 +1,51 @@
 from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel
-import httpx
+from pydantic import BaseModel, Field
 from supabase import create_client, Client
+from dotenv import load_dotenv
+import httpx
+import os
+
+# Load environment variables
+load_dotenv()
+
+# Retrieve environment variables
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_KEY = os.getenv("SUPABASE_KEY")
+EDEN_API_KEY = os.getenv("EDEN_API_KEY")
+EDEN_API_URL = os.getenv("EDEN_API_URL")
+
+# Check if the environment variables are loaded correctly
+if not all([SUPABASE_URL, SUPABASE_KEY, EDEN_API_KEY, EDEN_API_URL]):
+    raise Exception("One or more environment variables are missing")
+
+
+# Create Supabase client
+supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 app = FastAPI()
 
-EDEN_API_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoiOGQ1MjhiMWYtMzE2OC00YTlkLWJlM2UtNDVhZTc5ZTZlNWI2IiwidHlwZSI6ImFwaV90b2tlbiJ9.Nt67Clk5spKmZEIOGjTbY4F74bsQqqsBop63DnfhFSs"
-EDEN_API_URL = "https://api.edenai.run/v2/text/generation"
-SUPABASE_URL = "https://cpghkbegmhsxejtgkjfm.supabase.co"
-SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNwZ2hrYmVnbWhzeGVqdGdramZtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MTY2MzE3NzUsImV4cCI6MjAzMjIwNzc3NX0.J05h8llKZXN1EP8AFMUAJBXkRxmPyJoGv6Q2eOQtSno"
-supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 class GenerateRequest(BaseModel):
     brand_positioning: str
-    features: list
+    features: list[str] = Field(..., min_items=1)
     tone: str
-    length: int
+    length: int = Field(..., gt=0)
 
-    def __init__(self, **data):
-        if not data.get('brand_positioning'):
-            raise ValueError('Brand positioning cannot be empty')
-        if not data.get('features'):
-            raise ValueError('Features cannot be empty')
-        if not data.get('tone'):
-            raise ValueError('Tone cannot be empty')
-        if data.get('length', 0) <= 0:
-            raise ValueError('Length must be a positive integer')
-        super().__init__(**data)
-
-class InsertData(BaseModel):
+class Data(BaseModel):
     positioning: str
     features: str
     tone: str
     length: str
     output: str
 
+class DataResponse(BaseModel):
+    message: str
+
 class RegenerateRequest(BaseModel):
     complete_text: str
     selected_text: str
     length_modification: str
+
 
 def call_eden_ai(prompt: str) -> str:
     headers = {
@@ -52,32 +59,17 @@ def call_eden_ai(prompt: str) -> str:
         "max_tokens": 400
     }
     
-    with httpx.Client(timeout=10.0) as client:
-        try:
+    try:
+        with httpx.Client(timeout=10.0) as client:
             response = client.post(EDEN_API_URL, headers=headers, json=data)
             response.raise_for_status()
             response_json = response.json()
             generated_text = response_json.get('openai', {}).get('generated_text', '')
             return generated_text.strip()
-        except (httpx.HTTPStatusError, KeyError, IndexError) as e:
-            raise HTTPException(status_code=500, detail=str(e))
+    except httpx.HTTPStatusError as e:
+        raise HTTPException(status_code=e.response.status_code, detail=str(e))
 
 REFERENCE_PROMPT = """
-You are a copywriter at a marketing agency working on a brochure for a real estate developer.
-Generate a narrative flow for the real estate brochure keeping in mind the brand positioning and features of the property.
-
-<BRAND POSITIONING>
-{brand_positioning}
-</BRAND POSITIONING>
-
-<FEATURES>
-{features}
-</FEATURES>
-
-Keep the tone of the narrative {tone}.
-Also make sure that the length of the copy is {length} sentences.
-"""
-REGENERATE_PROMPT = """
 You are a copywriter at a marketing agency working on a brochure for a real estate developer.
 Generate a narrative flow for the real estate brochure keeping in mind the brand positioning and features of the property.
 
@@ -108,7 +100,7 @@ Here are the instructions you must follow:
 
 <SELECTED PORTION>
 {selected_text}
-</SELECTED_PORTION>
+</SELECTED PORTION>
 
 The selected portion should be made {length_modification}. 
 
@@ -120,7 +112,6 @@ Remember, your task is to regenerate the selected portion and return the entire 
 
 Generate and return the complete text containing the modification, without providing any other information or sentences.
 """
-
 
 @app.post("/generate")
 async def generate(request: GenerateRequest):
@@ -136,21 +127,25 @@ async def generate(request: GenerateRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.post("/insert")
-async def insert_data(data: InsertData):
+@app.post("/insert", response_model=DataResponse)
+async def insert_data(data: Data):
     try:
+        # Perform the insert operation
         response = supabase.table('marketing_copy').insert({
-            "positioning": data.positioning,
-            "features": data.features,
-            "tone": data.tone,
-            "length": data.length,
-            "output": data.output
+            'positioning': data.positioning,
+            'features': data.features,
+            'tone': data.tone,
+            'length': data.length,
+            'output': data.output
         }).execute()
-        
-        if response.error:
-            raise HTTPException(status_code=500, detail=response.error.message)
-        
+
+        # Check if there are any errors in the response
+        if isinstance(response, Exception):
+            raise HTTPException(status_code=500, detail="Error executing insert operation")
+
+        # Return a success message
         return {"message": "Data inserted successfully"}
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
