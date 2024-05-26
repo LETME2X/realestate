@@ -1,5 +1,6 @@
 from enum import Enum
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from supabase import create_client, Client
 from dotenv import load_dotenv
@@ -23,6 +24,15 @@ supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 # Initialize FastAPI app
 app = FastAPI()
+
+# Configure CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000"],  # Replace with your frontend URL
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # Tone Enum
 class Tone(str, Enum):
@@ -131,6 +141,10 @@ def call_eden_ai(prompt: str) -> str:
             return generated_text.strip()
     except httpx.HTTPStatusError as e:
         raise HTTPException(status_code=e.response.status_code, detail=str(e))
+    except httpx.RequestError as e:
+        raise HTTPException(status_code=500, detail="Error communicating with Eden AI API")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 # API endpoints
 @app.post("/generate")
