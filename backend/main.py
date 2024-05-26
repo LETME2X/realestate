@@ -1,3 +1,4 @@
+from enum import Enum
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 from supabase import create_client, Client
@@ -17,26 +18,32 @@ EDEN_API_URL = os.getenv("EDEN_API_URL")
 if not all([SUPABASE_URL, SUPABASE_KEY, EDEN_API_KEY, EDEN_API_URL]):
     raise Exception("One or more environment variables are missing")
 
-# Create Supabase client
+# Supabase client
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 # Initialize FastAPI app
 app = FastAPI()
+
+# Tone Enum
+class Tone(str, Enum):
+    Casual = "Casual"
+    Formal = "Formal"
+    Grandiose = "Grandiose"
 
 # Pydantic models
 class GenerateRequest(BaseModel):
     """Request model for generating marketing copy."""
     brand_positioning: str
     features: list[str] = Field(..., min_items=1)
-    tone: str
-    length: int = Field(..., gt=0)
+    tone: Tone
+    length: str = Field(..., pattern="^(Short|Medium|Long)$")
 
 class Data(BaseModel):
     """Model for inserting data into Supabase."""
-    positioning: str
-    features: str
-    tone: str
-    length: str
+    brand_positioning: str
+    features: list[str] = Field(..., min_items=1)
+    tone: Tone
+    length: str = Field(..., pattern="^(Short|Medium|Long)$")
     output: str
 
 class DataResponse(BaseModel):
@@ -48,6 +55,13 @@ class RegenerateRequest(BaseModel):
     complete_text: str
     selected_text: str
     length_modification: str
+
+# Length mapping
+LENGTH_MAPPING = {
+    "Short": 5,
+    "Medium": 9,
+    "Long": 18
+}
 
 # Text prompts
 REFERENCE_PROMPT = """
@@ -94,7 +108,7 @@ Remember, your task is to regenerate the selected portion and return the entire 
 Generate and return the complete text containing the modification, without providing any other information or sentences.
 """
 
-# Helper function to call Eden AI API
+# calling Eden AI API
 def call_eden_ai(prompt: str) -> str:
     """Call Eden AI API to generate or regenerate text."""
     headers = {
@@ -122,11 +136,12 @@ def call_eden_ai(prompt: str) -> str:
 @app.post("/generate")
 async def generate(request: GenerateRequest):
     """Generate marketing copy."""
+    length_in_sentences = LENGTH_MAPPING[request.length]
     prompt = REFERENCE_PROMPT.format(
         brand_positioning=request.brand_positioning,
         features='\n'.join(request.features),
         tone=request.tone,
-        length=request.length
+        length=length_in_sentences
     )
     try:
         generated_copy = call_eden_ai(prompt)
@@ -139,7 +154,7 @@ async def insert_data(data: Data):
     """Insert data into Supabase."""
     try:
         response = supabase.table('marketing_copy').insert({
-            'positioning': data.positioning,
+            'brand_positioning': data.brand_positioning,
             'features': data.features,
             'tone': data.tone,
             'length': data.length,
