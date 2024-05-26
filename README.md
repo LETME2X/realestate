@@ -6,16 +6,16 @@ This repository contains the backend code for generating marketing copy using Su
 
 ### 1. Clone the Repository
 
-\`\`\`bash
+```bash
 git clone https://github.com/your-username/marketing-copy-backend.git
 cd marketing-copy-backend
-\`\`\`
+```
 
 ### 2. Install Dependencies
 
-\`\`\`bash
+```bash
 pip install -r requirements.txt
-\`\`\`
+```
 
 ### 3. Set Up Environment Variables
 
