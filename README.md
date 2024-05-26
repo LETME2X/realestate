@@ -1,6 +1,6 @@
 # Marketing Copy Generation Backend
 
-This repository contains the backend code for generating marketing copy using Supabase and Eden AI.
+This repository contains the backend and frontend code for generating marketing copy using Supabase and Eden AI.
 
 ## Setup Instructions
 
