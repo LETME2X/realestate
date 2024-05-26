@@ -31,8 +31,7 @@ EDEN_API_URL=https://api.edenai.run/v2/text/generation
 ### 4. Run the Server
 
 ```bash
-uvicorn main
---host 0.0.0.0 --port 8000
+uvicorn main:app --reload
 ```
 
 ### Technologies Used
@@ -41,4 +40,4 @@ uvicorn main
     Supabase (Database)
     Eden AI (Text Generation API)
     Python 3.7+
-    EOF
+    
