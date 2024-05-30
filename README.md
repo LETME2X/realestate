@@ -7,7 +7,7 @@ This repository contains the backend and frontend code for generating marketing 
 ### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/your-username/marketing-copy-backend.git
+git clone https://github.com/LETME2X/realestate.git
 cd marketing-copy-backend
 ```
 
